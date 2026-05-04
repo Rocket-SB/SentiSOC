@@ -1,0 +1,24 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: SentiSOC_Docker_Logs
+    docker_sd_configs:
+      # This tells Promtail to ask the Docker daemon directly for the logs
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Drop the weird slash Docker puts in front of container names
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+      # Tag whether it is stdout or stderr
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'

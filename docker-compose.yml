@@ -1,0 +1,225 @@
+# SentiSOC — Docker Compose (Enterprise SOC Architecture)
+# Run: docker-compose up -d --build
+version: '3.9'
+
+services:
+  # ── IAM & INFRASTRUCTURE ────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:     sentisoc
+      POSTGRES_PASSWORD: sentisoc_pass
+      POSTGRES_DB:       sentisoc
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "sentisoc"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: always
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.0
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8081:8080"
+    restart: always
+
+  # ── SUPERVISOR: Management Plane (High Priority) ──────────────────────────
+  frontend:
+    build: ./frontend
+    # ports:             
+    #   - "8090:8080"
+    environment:
+      SECRET_KEY:      "frontend-secret"
+      AUTH_URL:        "http://auth-service:5001"
+      RESERVATION_URL: "http://reservation-service:5002"
+      RESOURCE_URL:    "http://resource-service:5003"
+      PROMETHEUS_URL:  "http://prometheus:9090"
+      LOKI_URL:        "http://loki:3100"
+    depends_on:
+      - auth-service
+      - reservation-service
+      - resource-service
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.25'      # Guaranteed CPU for the dashboard
+          memory: 512M      # Guaranteed RAM for the dashboard
+    restart: always
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8000:80"  # NGINX devient la NOUVELLE porte d'entrée sur le port 8000
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - auth-service
+    restart: always
+
+  # ── TARGETS: Microservices (Isolated & Limited) ─────────────────────────────
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "5001:5001"
+    environment:
+      SECRET_KEY:   "super-secret-jwt-key-change-in-prod"
+      DATABASE_URL: "sqlite:////app/data/auth.db"
+      ADMIN_KEY:    "admin-secret"
+    volumes:
+      - auth_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5001/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'      # ATTACK LIMIT: Cannot exceed 50% CPU
+          memory: 256M      # ATTACK LIMIT: Cannot exceed 256MB RAM
+    restart: on-failure
+
+  reservation-service:
+    build: ./reservation-service
+    ports:
+      - "5002:5002"
+    environment:
+      SECRET_KEY:   "super-secret-jwt-key-change-in-prod"
+      DATABASE_URL: "sqlite:////app/data/reservations.db"
+    volumes:
+      - reservation_data:/app/data
+    depends_on:
+      auth-service:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.30'
+          memory: 256M
+    restart: on-failure
+
+  resource-service:
+    build: ./resource-service
+    ports:
+      - "5003:5003"
+    environment:
+      SECRET_KEY:   "super-secret-jwt-key-change-in-prod"
+      DATABASE_URL: "sqlite:////app/data/resources.db"
+    volumes:
+      - resource_data:/app/data
+    depends_on:
+      auth-service:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.30'
+          memory: 256M
+    restart: on-failure
+
+  # ── SOC INFRASTRUCTURE & MONITORING ──────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d'
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.20'
+    restart: always
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "sentisoc123"
+      GF_USERS_ALLOW_SIGN_UP:     "false"
+    volumes:
+      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./monitoring/grafana-dashboard.json:/etc/grafana/provisioning/dashboards/sentisoc.json:ro
+      - ./monitoring/grafana-dashboard-provider.yml:/etc/grafana/provisioning/dashboards/provider.yml:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: always
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    deploy:
+      resources:
+        reservations:
+          memory: 128M
+    restart: always
+
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: always
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    restart: always
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    deploy:
+      mode: global
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: always
+
+# ── VOLUMES ──────────────────────────────────────────────────────────────────
+volumes:
+  pgdata:
+  auth_data:
+  reservation_data:
+  resource_data:
+  grafana_data:

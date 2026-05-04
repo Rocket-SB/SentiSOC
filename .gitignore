@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.db
+
+# Docker
+.docker/
+
+# Secrets (never commit these)
+.env
+*.pem
+*.key
+
+# Test artifacts
+.pytest_cache/
+coverage.xml
+*.sarif
+bandit-*.json
+audit-*.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Docker
+.docker/
+alert_history.json
+
+# IDE
+.vscode/
+.idea/

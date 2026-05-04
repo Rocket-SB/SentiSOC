@@ -1,0 +1,42 @@
+# NetworkPolicy — micro-segmentation
+# Auth service only accepts traffic from frontend + internal services
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-service-policy
+  namespace: sentisoc
+spec:
+  podSelector:
+    matchLabels:
+      app: auth-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              tier: frontend
+        - podSelector:
+            matchLabels:
+              tier: backend
+      ports:
+        - port: 5001
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-default
+  namespace: sentisoc
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

@@ -1,0 +1,21 @@
+route:
+  group_by: ['alertname']
+  group_wait: 5s       
+  group_interval: 1m
+  repeat_interval: 1h
+  receiver: 'discord_alerts'
+
+receivers:
+  - name: 'discord_alerts'
+    discord_configs:
+      - webhook_url: 'https://discord.com/api/webhooks/1500921879588769904/YmH1TMuMOKHycPr8xE2_595e0cEW3gLjgrd1STa7zaCN1-TW1r3LbZ9HqqUothcEqJNP'
+        title: '🚨 {{ .Status | toUpper }} : {{ .GroupLabels.alertname }}'
+        message: |-
+          {{ range .Alerts }}
+          **Description:** {{ .Annotations.description }}
+          **Sévérité:** `{{ .Labels.severity }}`
+          **Cible:** {{ .Labels.instance }}
+          {{ end }}
+    webhook_configs:
+      - url: 'http://frontend:8080/api/webhook/alerts'
+        send_resolved: true

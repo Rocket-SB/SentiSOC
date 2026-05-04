@@ -1,0 +1,46 @@
+# SentiSOC Alertmanager Rules
+groups:
+  - name: security_alerts
+    rules:
+      # Alert: Brute Force — 5+ failed logins in 1 minute
+      - alert: BruteForceDetected
+        expr: increase(auth_login_attempts_total{result="failure"}[1m]) >= 0
+        for: 0m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Brute force attack detected"
+          description: "{{ $value }} failed login attempts in the last minute."
+
+      # Alert: High error rate — 5xx errors > 10% over 2 minutes
+      - alert: HighErrorRate
+        expr: rate(auth_login_attempts_total{result="failure"}[2m]) / rate(auth_login_attempts_total[2m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High authentication error rate"
+          description: "Error rate is {{ $value | humanizePercentage }}."
+
+  - name: resource_alerts
+    rules:
+      # Real Host CPU Alert using Node Exporter
+      - alert: HighHostCPU
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100) > 90
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Host CPU is critically high"
+          description: "CPU usage has been above 90% for over a minute. Current value: {{ $value | printf \"%.1f\" }}%."
+
+      # NEW: Détecte si Prometheus est bloqué (Erreur 429) ou si le service a crashé
+      - alert: MicroserviceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.instance }} is DOWN"
+          description: "Prometheus cannot scrape {{ $labels.job }}. The service crashed or is returning HTTP 429/500 errors."

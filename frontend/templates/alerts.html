@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SentiSOC — Alerts</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+    :root {
+      --bg: #0a0e1a; --surface: #111827; --border: #1e2d45;
+      --accent: #00d4ff; --text: #e2e8f0; --muted: #64748b;
+      --success: #22c55e; --danger: #ef4444; --warn: #f59e0b;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; min-height: 100vh;}
+    nav {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 0 24px; display: flex; align-items: center;
+      justify-content: space-between; height: 56px;
+    }
+    .nav-brand { font-family: 'IBM Plex Mono', monospace; color: var(--accent); font-size: 18px; letter-spacing: 2px; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 13px; margin-left: 16px; transition: color 0.2s;}
+    .nav-links a:hover { color: var(--accent); }
+    main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
+    h1 { font-size: 22px; margin-bottom: 8px; }
+    .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
+    .panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden; margin-bottom: 24px;
+    }
+    .panel-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-header h2 { font-size: 14px; font-weight: 600; }
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 10px 20px; text-align: left; font-size: 11px; color: var(--muted);
+         text-transform: uppercase; letter-spacing: 1px;
+         border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+    td { padding: 12px 20px; font-size: 13px; border-bottom: 1px solid rgba(30,45,69,0.5); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(0,212,255,0.02); }
+    .badge { font-family: 'IBM Plex Mono', monospace; font-size: 10px;
+             padding: 2px 8px; border-radius: 4px; letter-spacing: 1px; text-transform: uppercase;}
+    .sev-critical { background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+    .sev-warning { background: rgba(245,158,11,0.15); color: var(--warn); border: 1px solid rgba(245,158,11,0.3); }
+    .sev-info { background: rgba(0,212,255,0.1); color: var(--accent); border: 1px solid rgba(0,212,255,0.3); }
+    .mono { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+    .empty { padding: 32px 20px; text-align: center; color: var(--muted); font-size: 13px; }
+    
+    /* Discord Integration Tag */
+    .discord-tag { font-size: 10px; color: #5865F2; display: flex; align-items: center; gap: 4px; }
+
+    /* New CSS for the Status Dropdown */
+    .status-select {
+      background: rgba(0,0,0,0.2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+    }
+    .status-select:focus { border-color: var(--accent); }
+    /* Dynamic colors for the dropdown text based on selection */
+    .status-select.val-pending { color: var(--warn); }
+    .status-select.val-investigating { color: var(--accent); }
+    .status-select.val-resolved { color: var(--success); }
+    .status-select.val-rejected { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="nav-brand">SentiSOC</span>
+    <div class="nav-links">
+      <a href="/dashboard">Dashboard</a>
+      <a href="/alerts" style="color: var(--accent);">Alerts</a>
+      {% if user.role == 'admin' %}
+      <a href="/admin">Admin Panel</a>
+      <a href="/logs">Logs</a>
+      <a href="/reports">Reports</a>
+      {% endif %}
+      <a href="/logout">Logout</a>
+    </div>
+  </nav>
+  <main>
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;">
+      <h1>Active Alerts</h1>
+      <div class="discord-tag">
+        <span style="width: 8px; height: 8px; background: #5865F2; border-radius: 50%;"></span>
+        Discord Webhook Active
+      </div>
+    </div>
+    <p class="subtitle">Real-time security and resource anomalies synced from Alertmanager.</p>
+
+    <!-- Firing Alerts Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <h2>Firing Alerts</h2>
+        <span class="badge" style="background: rgba(100,116,139,0.2); color: var(--text);">{{ alerts|length }} Active</span>
+      </div>
+      {% if alerts %}
+      <table>
+        <thead><tr><th>Timestamp</th><th>Alert Name</th><th>Severity</th><th>Description</th></tr></thead>
+        <tbody>
+          {% for alert in alerts %}
+          <tr>
+            <td class="mono" style="color:var(--muted)">{{ alert.startsAt[:19] }}</td>
+            <td><strong>{{ alert.labels.alertname }}</strong></td>
+            <td>
+              <span class="badge sev-{{ alert.labels.severity }}">{{ alert.labels.severity }}</span>
+            </td>
+            <td>{{ alert.annotations.description }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty">No firing alerts at this time. Systems are nominal.</div>
+      {% endif %}
+    </div>
+
+    <!-- Incident History Panel -->
+    <div class="panel" style="margin-top: 32px;">
+      <div class="panel-header">
+        <h2>Incident History (Audit Log)</h2>
+        <span class="badge" style="background: rgba(100,116,139,0.2); color: var(--text);">Last 100 events</span>
+      </div>
+      
+      {% if history %}
+      <table>
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>System Status</th>
+            <th>Alert Name</th>
+            <th>Severity</th>
+            <!-- NEW COLUMN -->
+            <th>Triage Resolution</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in history %}
+          <tr>
+            <td class="mono" style="color:var(--muted)">{{ event.timestamp }}</td>
+            <td>
+              {% if event.status == 'firing' %}
+                <span style="color: var(--danger); font-weight: bold;">🔴 TRIGGERED</span>
+              {% else %}
+                <span style="color: var(--success); font-weight: bold;">🟢 RESOLVED</span>
+              {% endif %}
+            </td>
+            <td><strong>{{ event.name }}</strong></td>
+            <td>
+              <span class="badge sev-{{ event.severity }}">{{ event.severity }}</span>
+            </td>
+            <!-- NEW TRIAGE DROPDOWN -->
+            <td>
+              <!-- We pass the loop.index0 (array index) to update the exact item in JSON -->
+              <select class="status-select val-{{ event.resolution | default('pending') }}" 
+                      onchange="updateResolution({{ loop.index0 }}, this.value, this)">
+                <option value="pending" {% if event.resolution == 'pending' or not event.resolution %}selected{% endif %}>⏳ Pending</option>
+                <option value="investigating" {% if event.resolution == 'investigating' %}selected{% endif %}>🔍 Investigating</option>
+                <option value="resolved" {% if event.resolution == 'resolved' %}selected{% endif %}>✅ True Positive (Solved)</option>
+                <option value="rejected" {% if event.resolution == 'rejected' %}selected{% endif %}>❌ False Positive (Reject)</option>
+              </select>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty">No historical events recorded yet.</div>
+      {% endif %}
+    </div>
+  </main>
+
+  <!-- JavaScript to send the dropdown change to Python -->
+  <script>
+    function updateResolution(index, newStatus, selectElement) {
+      // 1. Update the color of the dropdown immediately
+      selectElement.className = 'status-select val-' + newStatus;
+
+      // 2. Send the update to the backend
+      fetch('/api/webhook/alerts/triage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ index: index, resolution: newStatus })
+      })
+      .then(response => {
+        if (!response.ok) {
+          alert('Failed to save triage status. Is the server running?');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    }
+  </script>
+</body>
+</html>

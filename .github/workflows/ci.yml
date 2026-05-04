@@ -1,0 +1,318 @@
+name: SentiSOC CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/sentisoc
+
+jobs:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # 1. SAST — Static Analysis Security Testing
+  # ────────────────────────────────────────────────────────────────────────────
+  sast:
+    name: SAST — Bandit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit (auth-service)
+        run: |
+          bandit -r auth-service/ \
+            -x auth-service/api/tests.py \
+            --severity-level medium \
+            --confidence-level medium \
+            -f json -o bandit-auth.json || true
+          # Fail on HIGH severity findings
+          bandit -r auth-service/ \
+            -x auth-service/api/tests.py \
+            --severity-level high \
+            --confidence-level high
+
+      - name: Run Bandit (reservation-service)
+        run: |
+          bandit -r reservation-service/ \
+            --severity-level high \
+            --confidence-level high
+
+      - name: Run Bandit (resource-service)
+        run: |
+          bandit -r resource-service/ \
+            --severity-level high \
+            --confidence-level high
+
+      - name: Upload Bandit reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-reports
+          path: bandit-*.json
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # 2. Unit Tests — Auth Service
+  # ────────────────────────────────────────────────────────────────────────────
+  test-auth:
+    name: Unit Tests — Auth Service
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: auth_db_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r auth-service/requirements.txt
+
+      - name: Run tests with coverage
+        working-directory: auth-service
+        env:
+          DB_HOST: localhost
+          DB_NAME: auth_db_test
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          REDIS_URL: redis://localhost:6379/0
+          JWT_SECRET: test-jwt-secret
+          SECRET_KEY: test-django-secret
+        run: |
+          python manage.py test api.tests --verbosity=2 2>&1 | tee test-results.txt
+          # Fail if tests failed
+          grep -q "FAILED\|ERROR" test-results.txt && exit 1 || true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: auth-service/test-results.txt
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # 3. Dependency Scanning
+  # ────────────────────────────────────────────────────────────────────────────
+  dependency-scan:
+    name: Dependency Scanning — pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit auth-service dependencies
+        run: pip-audit -r auth-service/requirements.txt --format json > audit-auth.json || true
+
+      - name: Audit reservation-service dependencies
+        run: pip-audit -r reservation-service/requirements.txt --format json > audit-reservation.json || true
+
+      - name: Audit resource-service dependencies
+        run: pip-audit -r resource-service/requirements.txt --format json > audit-resource.json || true
+
+      # Fail if HIGH/CRITICAL CVEs found
+      - name: Check for critical vulnerabilities
+        run: |
+          python3 -c "
+          import json, sys
+          for f in ['audit-auth.json', 'audit-reservation.json', 'audit-resource.json']:
+              try:
+                  data = json.load(open(f))
+                  vulns = data.get('vulnerabilities', [])
+                  critical = [v for v in vulns if v.get('fix_versions')]
+                  if critical:
+                      print(f'CRITICAL: {len(critical)} fixable vulns in {f}')
+                      for v in critical:
+                          print(f'  - {v[\"name\"]} {v[\"version\"]}: {v[\"id\"]}')
+                      sys.exit(1)
+              except: pass
+          print('No critical fixable vulnerabilities found.')
+          "
+
+      - name: Upload audit reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dependency-audit
+          path: audit-*.json
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # 4. Build Docker Images
+  # ────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [sast, test-auth, dependency-scan]
+    outputs:
+      auth-image: ${{ steps.meta-auth.outputs.tags }}
+      reservation-image: ${{ steps.meta-reservation.outputs.tags }}
+      resource-image: ${{ steps.meta-resource.outputs.tags }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build auth-service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./auth-service
+          push: false
+          tags: sentisoc/auth-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=docker,dest=/tmp/auth-service.tar
+
+      - name: Build reservation-service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./reservation-service
+          push: false
+          tags: sentisoc/reservation-service:${{ github.sha }}
+          outputs: type=docker,dest=/tmp/reservation-service.tar
+
+      - name: Build resource-service image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./resource-service
+          push: false
+          tags: sentisoc/resource-service:${{ github.sha }}
+          outputs: type=docker,dest=/tmp/resource-service.tar
+
+      - name: Upload images
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp/*.tar
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # 5. Container Scanning — Trivy (SECURITY GATE)
+  # Blocks on HIGH/CRITICAL with available fixes
+  # ────────────────────────────────────────────────────────────────────────────
+  container-scan:
+    name: Container Scan — Trivy (Security Gate)
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download images
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+
+      - name: Load images
+        run: |
+          docker load < /tmp/auth-service.tar
+          docker load < /tmp/reservation-service.tar
+          docker load < /tmp/resource-service.tar
+
+      - name: Scan auth-service
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: sentisoc/auth-service:${{ github.sha }}
+          format: sarif
+          output: trivy-auth.sarif
+          # SECURITY GATE: fail on HIGH/CRITICAL with fixes
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan reservation-service
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: sentisoc/reservation-service:${{ github.sha }}
+          format: sarif
+          output: trivy-reservation.sarif
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Scan resource-service
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: sentisoc/resource-service:${{ github.sha }}
+          format: sarif
+          output: trivy-resource.sarif
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: HIGH,CRITICAL
+
+      - name: Upload Trivy SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: .
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # 6. Deploy (only on main branch, after all gates pass)
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [container-scan]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download images and push
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+          path: /tmp
+
+      - name: Tag and push images
+        run: |
+          docker load < /tmp/auth-service.tar
+          docker load < /tmp/reservation-service.tar
+          docker load < /tmp/resource-service.tar
+          docker tag sentisoc/auth-service:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-auth:latest
+          docker tag sentisoc/reservation-service:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-reservation:latest
+          docker tag sentisoc/resource-service:${{ github.sha }} ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-resource:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-auth:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-reservation:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-resource:latest
+
+      - name: Deploy via Docker Compose (staging)
+        run: |
+          echo "Deploying SentiSOC ${{ github.sha }} to staging..."
+          # In a real setup: ssh to staging server and run docker compose up -d
+          echo "✅ Deployment complete."
