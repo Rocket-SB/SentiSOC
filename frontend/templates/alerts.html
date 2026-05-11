@@ -11,15 +11,25 @@
       --success: #22c55e; --danger: #ef4444; --warn: #f59e0b;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; min-height: 100vh;}
-    nav {
-      background: var(--surface); border-bottom: 1px solid var(--border);
-      padding: 0 24px; display: flex; align-items: center;
-      justify-content: space-between; height: 56px;
-    }
-    .nav-brand { font-family: 'IBM Plex Mono', monospace; color: var(--accent); font-size: 18px; letter-spacing: 2px; }
-    .nav-links a { color: var(--muted); text-decoration: none; font-size: 13px; margin-left: 16px; transition: color 0.2s;}
-    .nav-links a:hover { color: var(--accent); }
+    body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; display: flex; height: 100vh; overflow: hidden; }
+    
+    aside { width: 250px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-header { height: 56px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+    .sidebar-brand { font-family: 'IBM Plex Sans', sans-serif; font-weight: 500; font-size: 16px; color: #fff; display: flex; align-items: center; gap: 8px; }
+    .sidebar-toggle { color: var(--muted); cursor: pointer; font-size: 16px; }
+    .sidebar-toggle:hover { color: #fff; }
+    .sidebar-nav { flex: 1; padding: 16px 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+    .nav-item { padding: 8px 16px 8px 24px; color: var(--text); text-decoration: none; font-size: 14px; font-weight: 400; display: flex; align-items: center; justify-content: space-between; border-left: 2px solid transparent; }
+    .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+    .nav-item.active { background: rgba(0, 212, 255, 0.1); color: var(--accent); border-left: 2px solid var(--accent); font-weight: 500; }
+    .sidebar-footer { padding: 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+    .avatar { width: 32px; height: 32px; background: var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-size: 14px; font-weight: bold; }
+    .user-info { display: flex; flex-direction: column; }
+    .user-name { font-size: 13px; color: #fff; font-weight: 500; }
+    .user-role { font-size: 11px; color: var(--accent); font-family: 'IBM Plex Mono', monospace; text-transform: uppercase;}
+    
+    .main-wrapper { flex: 1; overflow-y: auto; background: var(--bg); }
+    .content { max-width: 1400px; margin: 0 auto; padding: 24px; }
     main { max-width: 1200px; margin: 0 auto; padding: 32px 24px; }
     h1 { font-size: 22px; margin-bottom: 8px; }
     .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
@@ -71,20 +81,52 @@
   </style>
 </head>
 <body>
-  <nav>
-    <span class="nav-brand">SentiSOC</span>
-    <div class="nav-links">
-      <a href="/dashboard">Dashboard</a>
-      <a href="/alerts" style="color: var(--accent);">Alerts</a>
-      {% if user.role == 'admin' %}
-      <a href="/admin">Admin Panel</a>
-      <a href="/logs">Logs</a>
-      <a href="/reports">Reports</a>
-      {% endif %}
-      <a href="/logout">Logout</a>
+  <aside>
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <span style="color: var(--accent); font-size: 18px;">⎈</span> SentiSOC
+      </div>
+      <div class="sidebar-toggle">◨</div> 
     </div>
-  </nav>
-  <main>
+
+    <div class="sidebar-nav">
+      <a href="/dashboard" class="nav-item">
+        <span>Home / Dashboard</span>
+      </a>
+      <a href="/alerts" class="nav-item active">
+        <span>Alerts & IRM</span>
+      </a>
+      <a href="/logs" class="nav-item">
+        <span>Logs Explorer</span>
+      </a>
+      <a href="/reports" class="nav-item">
+        <span>Reporting</span>
+      </a>
+      
+      {% if user.role == 'admin' %}
+      <a href="/admin" class="nav-item">
+        <span>Administration</span>
+      </a>
+      {% endif %}
+
+      <div style="flex-grow: 1;"></div> 
+      <a href="/logout" class="nav-item" style="border-top: 1px solid var(--border); padding-top: 16px;">
+        <span style="color: var(--danger);">Logout</span>
+      </a>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="avatar">{{ user.username[0] | upper }}</div>
+      <div class="user-info">
+        <span class="user-name">{{ user.username }}</span>
+        <span class="user-role">{{ user.role }}</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-wrapper">
+    <div class="content">
+      <main>
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;">
       <h1>Active Alerts</h1>
       <div class="discord-tag">
@@ -174,7 +216,9 @@
       <div class="empty">No historical events recorded yet.</div>
       {% endif %}
     </div>
-  </main>
+      </main>
+    </div>
+  </div>
 
   <!-- JavaScript to send the dropdown change to Python -->
   <script>
