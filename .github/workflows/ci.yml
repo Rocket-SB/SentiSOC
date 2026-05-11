@@ -10,6 +10,13 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/sentisoc
 
+# --- AJOUTE CE BLOC ICI ---
+permissions:
+  contents: read
+  security-events: write
+  packages: write
+# --------------------------
+
 jobs:
 
   # ────────────────────────────────────────────────────────────────────────────
@@ -269,7 +276,7 @@ jobs:
           severity: HIGH,CRITICAL
 
       - name: Upload Trivy SARIF results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4   # <-- Change @v3 en @v4 ici
         if: always()
         with:
           sarif_file: .
