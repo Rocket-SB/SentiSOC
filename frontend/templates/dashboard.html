@@ -5,141 +5,108 @@
   <title>SentiSOC — Dashboard</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
-
-    :root {
-      /* Palette de couleurs basée sur la nouvelle maquette */
-      --bg-main: #171b26;
-      --bg-panel: #1e2231;
-      --bg-header: #24293a;
-      --border: #2d3448;
-      --text-main: #bac4d9;
-      --text-muted: #7985a3;
-      
-      --color-green: #2ecc71;
-      --color-yellow: #f1c40f;
-      --color-red: #e74c3c;
-      --color-blue: #3498db;
-      --accent: #00d4ff;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
     
-    body { 
-      background-color: var(--bg-main); 
-      color: var(--text-main); 
-      font-family: 'IBM Plex Sans', -apple-system, sans-serif; 
-      font-size: 13px; 
-      min-height: 100vh;
+    :root {
+      --bg: #0f111a; /* Un peu plus sombre pour un look Grafana */
+      --surface: #181b26; 
+      --border: #2c3245; 
+      --accent: #00d4ff; 
+      --text: #e2e8f0; 
+      --muted: #8b9bb4;
+      --success: #2e9a48; /* Vert style Grafana */
+      --danger: #e02f44;  /* Rouge style Grafana */
+      --warn: #f59e0b;
     }
-
-    /* --- Navigation SentiSOC --- */
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: 'IBM Plex Sans', sans-serif; min-height: 100vh; }
+    
+    /* Navigation */
     nav {
-      background: var(--bg-panel); border-bottom: 1px solid var(--border);
+      background: var(--surface); border-bottom: 1px solid var(--border);
       padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 56px;
     }
-    .nav-brand { font-family: 'IBM Plex Mono', monospace; color: var(--accent); font-size: 18px; letter-spacing: 2px; font-weight: 600; }
+    .nav-brand { font-family: 'IBM Plex Mono', monospace; color: var(--accent); font-size: 18px; letter-spacing: 2px; }
     .nav-right { display: flex; align-items: center; gap: 16px; }
     .role-badge { font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 3px 10px; border-radius: 4px; letter-spacing: 1px; text-transform: uppercase; }
-    .role-admin { background: rgba(231,76,60,0.15); color: var(--color-red); border: 1px solid rgba(231,76,60,0.3); }
-    .role-user  { background: rgba(52,152,219,0.15); color: var(--color-blue); border: 1px solid rgba(52,152,219,0.3); }
+    .role-admin { background: rgba(224,47,68,0.15); color: var(--danger); border: 1px solid rgba(224,47,68,0.3); }
+    .role-user  { background: rgba(0,212,255,0.1);  color: var(--accent); border: 1px solid rgba(0,212,255,0.3); }
     .nav-links { display: flex; gap: 16px; align-items: center; }
-    .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 13px; transition: color 0.2s; font-weight: 600; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 13px; transition: color 0.2s; }
     .nav-links a:hover { color: var(--accent); }
-
+    
     main { max-width: 1400px; margin: 0 auto; padding: 24px; }
-
-    /* --- Système de Grille --- */
-    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-    .grid-bottom { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-
-    /* --- Panneaux (Cards) --- */
-    .panel {
-      background: var(--bg-panel);
+    
+    /* Grafana Style Panels */
+    .g-panel {
+      background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 4px;
+      border-radius: 2px; /* Coins plus carrés */
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
-    
-    .panel-header {
-      background: var(--bg-header);
-      padding: 10px 16px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--text-main);
+    .g-panel-header {
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
     }
-
-    .panel-body { padding: 16px; flex-grow: 1; }
-    .panel-body.no-padding { padding: 0; }
-
-    /* --- Indicateurs du haut (Top Row) --- */
-    .kpi-box {
-      display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px;
+    .g-panel-body {
+      flex: 1;
+      display: flex;
+      padding: 8px;
+      gap: 8px;
     }
-    .kpi-label { font-size: 10px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; letter-spacing: 1px;}
-    .kpi-value { font-size: 24px; font-weight: bold; font-family: 'IBM Plex Mono', monospace; }
     
-    .text-green { color: var(--color-green); }
-    .text-yellow { color: var(--color-yellow); }
-    .text-blue { color: var(--color-blue); }
-    .text-red { color: var(--color-red); }
-
-    /* --- Tableaux --- */
-    table { width: 100%; border-collapse: collapse; text-align: left; }
-    th { 
-      padding: 10px 16px; font-size: 10px; text-transform: uppercase; color: var(--text-muted); 
-      border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.1);
+    /* Solid Color Stat Blocks */
+    .stat-solid {
+      flex: 1;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
     }
-    td { 
-      padding: 12px 16px; font-size: 12px; border-bottom: 1px solid rgba(45, 52, 72, 0.5); 
-      font-family: 'IBM Plex Mono', monospace;
-    }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background-color: rgba(255,255,255,0.02); }
+    .stat-bg-red { background-color: var(--danger); color: white; }
+    .stat-bg-green { background-color: var(--success); color: white; }
+    .stat-bg-dark { background-color: transparent; color: var(--text); }
+    
+    .stat-label { font-size: 12px; margin-bottom: 4px; font-weight: 400; z-index: 2; }
+    .stat-value { font-size: 42px; font-weight: 500; z-index: 2; line-height: 1; }
+    .stat-value-center { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 48px; }
 
-    /* --- Badges --- */
-    .badge {
-      padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; text-transform: uppercase;
-      font-family: 'IBM Plex Sans', sans-serif;
-    }
-    .badge-blue { background: rgba(52, 152, 219, 0.15); color: #6db1ff; border: 1px solid rgba(52, 152, 219, 0.3); }
-    .badge-green { color: var(--color-green); border: 1px solid rgba(46, 204, 113, 0.4); background: rgba(46, 204, 113, 0.1); }
-    .badge-red { color: var(--color-red); border: 1px solid rgba(231, 76, 60, 0.4); background: rgba(231, 76, 60, 0.1); }
-    .badge-gray { color: var(--text-muted); border: 1px solid var(--border); background: rgba(255,255,255,0.05); }
+    /* Grids */
+    .top-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; height: 140px; }
+    .middle-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 8px; margin-bottom: 24px; }
+    /* Mise à jour ici : 3 colonnes pour accueillir les actions */
+    .bottom-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
 
-    .empty-row { text-align: center; color: var(--text-muted); padding: 24px; font-size: 12px; font-family: 'IBM Plex Sans', sans-serif; }
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 10px 12px; text-align: left; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+    td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid rgba(44,50,69,0.5); }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .badge { font-family: 'IBM Plex Mono', monospace; font-size: 10px; padding: 2px 8px; border-radius: 4px; }
+    .badge-green  { background: rgba(46,154,72,0.15); color: var(--success); border: 1px solid rgba(46,154,72,0.3); }
+    .badge-red    { background: rgba(224,47,68,0.15); color: var(--danger); border: 1px solid rgba(224,47,68,0.3); }
+    .badge-gray   { background: rgba(139,155,180,0.15); color: var(--muted); border: 1px solid rgba(139,155,180,0.3); }
 
-    /* --- Barres de progression (Logs) --- */
-    .progress-wrapper { margin-bottom: 10px; }
-    .progress-info { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 6px; }
-    .progress-bar-bg { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
-    .progress-fill-green { height: 100%; background: var(--color-green); width: 100%; }
-    .progress-fill-blue { height: 100%; background: var(--color-blue); width: 24%; }
-
-    /* --- Boutons d'action --- */
+    /* --- NOUVEAU : Boutons d'action --- */
     .action-btn {
-      display: block; width: 100%; text-align: center; padding: 12px; background: var(--bg-header);
-      color: var(--text-main); text-decoration: none; border: 1px solid var(--border); border-radius: 4px;
+      display: block; width: 100%; text-align: center; padding: 12px; background: rgba(0,0,0,0.2);
+      color: var(--text); text-decoration: none; border: 1px solid var(--border); border-radius: 4px;
       margin-bottom: 10px; font-size: 12px; font-weight: 600; transition: all 0.2s; text-transform: uppercase;
     }
-    .action-btn:hover { background: #2a3045; border-color: #3b4460; cursor: pointer; color: #fff; }
+    .action-btn:hover { background: rgba(0, 212, 255, 0.1); border-color: var(--accent); color: var(--accent); }
     .action-btn:last-child { margin-bottom: 0; }
-
-    /* --- Gauges Grid --- */
-    .gauges-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: center; height: 100%; }
   </style>
 </head>
 <body>
-
   <nav>
     <span class="nav-brand">SentiSOC</span>
     <div class="nav-right">
@@ -154,203 +121,192 @@
         <a href="/logout">Logout</a>
       </div>
       <span class="role-badge role-{{ user.role }}">{{ user.role }}</span>
-      <span style="font-size:13px; color:var(--text-muted); font-family: 'IBM Plex Mono', monospace;">{{ user.username }}</span>
+      <span style="font-size:13px; color:var(--muted)">{{ user.username }}</span>
     </div>
   </nav>
 
   <main>
-    <div class="grid-4">
-      <div class="panel kpi-box">
-        <span class="kpi-label">System Status</span>
-        <span class="kpi-value text-green">OK</span>
+    <div class="top-grid">
+      
+      <div class="g-panel">
+        <div class="g-panel-header">
+          <span>Total Login Attempts</span>
+          <span style="color: var(--muted); cursor: pointer;">⋮</span>
+        </div>
+        <div class="g-panel-body">
+          <div class="stat-solid stat-bg-red">
+            <div class="stat-label">failure</div>
+            <div class="stat-value">{{ metrics_failure | default(134) }}</div>
+          </div>
+          <div class="stat-solid stat-bg-green">
+            <div class="stat-label">success</div>
+            <div class="stat-value">{{ metrics_success | default(22) }}</div>
+          </div>
+        </div>
       </div>
-      <div class="panel kpi-box">
-        <span class="kpi-label">Failed Logins (5m)</span>
-        <span class="kpi-value text-red">{{ metrics_failed_5m | default('0') }}</span>
+
+      <div class="g-panel">
+        <div class="g-panel-header">Failed Logins (last 5m)</div>
+        <div class="g-panel-body" style="padding: 0;">
+          <div class="stat-solid stat-bg-red">
+            <div class="stat-value stat-value-center">{{ metrics_failed_5m | default('20.7') }}</div>
+          </div>
+        </div>
       </div>
-      <div class="panel kpi-box">
-        <span class="kpi-label">Registered Users</span>
-        <span class="kpi-value text-blue">{{ metrics_users | default('3') }}</span>
+
+      <div class="g-panel">
+        <div class="g-panel-header">Registered Users</div>
+        <div class="g-panel-body" style="padding: 0;">
+          <div class="stat-solid stat-bg-green">
+            <div class="stat-value stat-value-center">{{ metrics_users | default(3) }}</div>
+          </div>
+        </div>
       </div>
-      <div class="panel kpi-box">
-        <span class="kpi-label">Local Time</span>
-        <span class="kpi-value" style="color: var(--text-main);" id="clock">--:--:--</span>
+
+      <div class="g-panel">
+        <div class="g-panel-header">
+          <span>Active Reservations</span>
+          <span style="color: var(--muted);">⟳</span>
+        </div>
+        <div class="g-panel-body" style="padding: 0;">
+          <div class="stat-solid stat-bg-dark">
+            <div class="stat-value stat-value-center">
+              {{ reservations | selectattr('status', 'equalto', 'active') | list | length }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="middle-grid">
+      
+      <div class="g-panel" style="min-height: 220px;">
+        <div class="g-panel-header">
+          <span>Login Attempts Over Time</span>
+          <span style="color: var(--muted);">⟳</span>
+        </div>
+        <div class="g-panel-body" style="background: rgba(0,0,0,0.1); align-items: center; justify-content: center;">
+          <span style="color: var(--border);">[Empty]</span>
+        </div>
+      </div>
+
+      <div class="gauges-grid">
+        
+        {% macro render_grafana_gauge(title, value) %}
+          {% set has_data = value > 0 %}
+          {% set color = '#2e9a48' if value < 60 else ('#f59e0b' if value < 85 else '#e02f44') %}
+          {% if not has_data %} {% set color = '#4a5568' %} {% endif %}
+          {% set dash_total = 125.6 %}
+          {% set dash_offset = dash_total - ((value / 100) * dash_total) %}
+
+          <div class="g-panel" style="padding: 12px; position: relative;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--accent);">{{ title }}</div>
+            
+            <div style="margin-top: 16px; position: relative;">
+              <svg viewBox="0 0 100 55" style="width: 100%; overflow: visible;">
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#2e9a48" stroke-width="2" stroke-dasharray="125.6" stroke-dashoffset="50.2" />
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="125.6" stroke-dashoffset="-75.4" />
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#e02f44" stroke-width="2" stroke-dasharray="125.6" stroke-dashoffset="-106.7" />
+                <path d="M 15 50 A 35 35 0 0 1 85 50" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="12" />
+                
+                {% if has_data %}
+                <path d="M 15 50 A 35 35 0 0 1 85 50" fill="none" stroke="{{ color }}" stroke-width="12" 
+                      stroke-dasharray="{{ dash_total }}" stroke-dashoffset="{{ dash_offset }}" 
+                      style="transition: stroke-dashoffset 1s ease-out;" />
+                {% endif %}
+              </svg>
+              <div style="position: absolute; bottom: 0; left: 0; right: 0; text-align: center;">
+                {% if has_data %}
+                  <span style="font-size: 20px; font-weight: 600; color: {{ color }};">{{ value }}%</span>
+                {% else %}
+                  <span style="font-size: 14px; font-weight: 600; color: #2e9a48;">No data</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endmacro %}
+
+        {{ render_grafana_gauge('Host CPU', server.cpu) }}
+        {{ render_grafana_gauge('Host RAM', server.ram) }}
+        {{ render_grafana_gauge('Host Disk', server.disk) }}
+
       </div>
     </div>
 
-    <div class="grid-2">
-      <div class="panel">
-        <div class="panel-header">
-          <span>Active Reservations</span>
-          <span style="color: var(--text-muted); font-size: 10px;">{{ reservations|length }} TOTAL</span>
+    <div class="bottom-grid">
+      
+      <div class="g-panel">
+        <div class="g-panel-header">
+          <span>Inventory</span>
+          <span class="badge badge-gray">{{ resources|length }} total</span>
         </div>
-        <div class="panel-body no-padding">
+        <div style="padding: 0;">
+          {% if resources %}
           <table>
-            <thead>
-              <tr>
-                <th>Resource</th>
-                <th>User</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for r in reservations %}
-              <tr>
-                <td style="color: var(--color-blue);">{{ r.resource_name }}</td>
-                <td>{{ r.username }}</td>
-                <td>
-                  {% if r.status == 'active' %}
-                  <span class="badge badge-green">ACTIVE</span>
-                  {% else %}
-                  <span class="badge badge-gray">CANCELLED</span>
-                  {% endif %}
-                </td>
-              </tr>
-              {% else %}
-              <tr>
-                <td colspan="3" class="empty-row">No reservations available or service offline.</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header">
-          <span>Live Resources Inventory</span>
-          <span style="color: var(--text-muted); font-size: 10px;">{{ resources|length }} TOTAL</span>
-        </div>
-        <div class="panel-body no-padding">
-          <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Location</th>
-                <th>Health Status</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Name</th><th>Location</th><th>Status</th></tr></thead>
             <tbody>
               {% for r in resources %}
               <tr>
                 <td><strong>{{ r.name }}</strong></td>
-                <td style="color: var(--text-muted);">{{ r.location }}</td>
+                <td><span style="color:var(--muted)">{{ r.location }}</span></td>
                 <td>
                   {% if r.available %}
-                  <span class="badge badge-green">ONLINE</span>
+                  <span class="badge badge-green">available</span>
                   {% else %}
-                  <span class="badge badge-red">OFFLINE</span>
+                  <span class="badge badge-red">offline</span>
                   {% endif %}
                 </td>
-              </tr>
-              {% else %}
-              <tr>
-                <td colspan="3" class="empty-row">No resources available or service offline.</td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
+          {% else %}
+          <div style="padding: 24px; text-align: center; color: var(--muted);">No resources found</div>
+          {% endif %}
         </div>
       </div>
-    </div>
 
-    <div class="grid-bottom">
+      <div class="g-panel">
+        <div class="g-panel-header">
+          <span>Recent Reservations</span>
+          <span class="badge badge-gray">{{ reservations|length }} total</span>
+        </div>
+        <div style="padding: 0;">
+          {% if reservations %}
+          <table>
+            <thead><tr><th>Resource</th><th>User</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for r in reservations %}
+              <tr>
+                <td>{{ r.resource_name }}</td>
+                <td style="font-family:'IBM Plex Mono',monospace; font-size:11px;">{{ r.username }}</td>
+                <td>
+                  {% if r.status == 'active' %}
+                  <span class="badge badge-green">active</span>
+                  {% else %}
+                  <span class="badge badge-gray">cancelled</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% else %}
+          <div style="padding: 24px; text-align: center; color: var(--muted);">No reservations yet</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="g-panel">
+        <div class="g-panel-header">Cluster Actions</div>
+        <div class="g-panel-body" style="display: flex; flex-direction: column; justify-content: center; padding: 24px;">
+          <a href="http://localhost:3000" target="_blank" class="action-btn">Open Grafana Console</a>
+          <a href="http://localhost:9090/targets" target="_blank" class="action-btn">Open Prometheus Targets</a>
+        </div>
+      </div>
       
-      <div class="panel">
-        <div class="panel-header">Hardware Load Metrics</div>
-        <div class="panel-body" style="padding: 12px;">
-          
-          <div class="gauges-grid">
-            {% macro render_grafana_gauge(title, value) %}
-              {% set has_data = value > 0 %}
-              {% set color = '#2ecc71' if value < 60 else ('#f1c40f' if value < 85 else '#e74c3c') %}
-              {% if not has_data %} {% set color = '#4a5568' %} {% endif %}
-              {% set dash_total = 125.6 %}
-              {% set dash_offset = dash_total - ((value / 100) * dash_total) %}
-
-              <div style="position: relative; text-align: center;">
-                <div style="font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 12px;">{{ title }}</div>
-                
-                <div style="position: relative;">
-                  <svg viewBox="0 0 100 55" style="width: 100%; max-width: 150px; overflow: visible;">
-                    <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#2ecc71" stroke-width="2" stroke-dasharray="125.6" stroke-dashoffset="50.2" />
-                    <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#f1c40f" stroke-width="2" stroke-dasharray="125.6" stroke-dashoffset="-75.4" />
-                    <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#e74c3c" stroke-width="2" stroke-dasharray="125.6" stroke-dashoffset="-106.7" />
-                    <path d="M 15 50 A 35 35 0 0 1 85 50" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="12" />
-                    
-                    {% if has_data %}
-                    <path d="M 15 50 A 35 35 0 0 1 85 50" fill="none" stroke="{{ color }}" stroke-width="12" 
-                          stroke-dasharray="{{ dash_total }}" stroke-dashoffset="{{ dash_offset }}" 
-                          style="transition: stroke-dashoffset 1s ease-out;" />
-                    {% endif %}
-                  </svg>
-                  <div style="position: absolute; bottom: 0; left: 0; right: 0; text-align: center;">
-                    {% if has_data %}
-                      <span style="font-size: 20px; font-weight: bold; color: {{ color }}; font-family: 'IBM Plex Mono', monospace;">{{ value }}%</span>
-                    {% else %}
-                      <span style="font-size: 14px; font-weight: 600; color: var(--text-muted);">No data</span>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            {% endmacro %}
-
-            {{ render_grafana_gauge('Host CPU', server.cpu) }}
-            {{ render_grafana_gauge('Host RAM', server.ram) }}
-            {{ render_grafana_gauge('Host Disk', server.disk) }}
-          </div>
-
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header">Log Pipeline & Storage</div>
-        <div class="panel-body">
-          
-          <div class="progress-wrapper">
-            <div class="progress-info">
-              <span style="color: var(--text-muted);">Promtail Pipeline</span>
-              <span class="text-green">ACTIVE</span>
-            </div>
-            <div style="font-size: 11px; margin-bottom: 8px; color: var(--text-main);">Scraping Logs</div>
-            <div class="progress-bar-bg">
-              <div class="progress-fill-green"></div>
-            </div>
-          </div>
-
-          <div class="progress-wrapper" style="margin-top: 24px;">
-            <div class="progress-info">
-              <span style="color: var(--text-muted);">Loki Retention</span>
-              <span class="text-blue">1.2GB / 5GB</span>
-            </div>
-            <div style="font-size: 11px; margin-bottom: 8px; color: var(--text-main);">Data Stored</div>
-            <div class="progress-bar-bg">
-              <div class="progress-fill-blue"></div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-header">Cluster Actions</div>
-        <div class="panel-body" style="display: flex; flex-direction: column; justify-content: center;">
-          <a href="http://localhost:3000" target="_blank" class="action-btn">Grafana Console</a>
-          <a href="http://localhost:9090/targets" target="_blank" class="action-btn">Prometheus Targets</a>
-        </div>
-      </div>
-
     </div>
   </main>
-
-  <script>
-    // Script pour faire fonctionner l'horloge locale en haut à droite
-    function updateClock() {
-      const now = new Date();
-      document.getElementById('clock').innerText = now.toLocaleTimeString('en-US', { hour12: false });
-    }
-    setInterval(updateClock, 1000);
-    updateClock();
-  </script>
 </body>
 </html>
