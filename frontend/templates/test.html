@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Infrastructure & Cluster Status</title>
+  <style>
+    :root {
+      /* Palette de couleurs basée sur la maquette */
+      --bg-main: #171b26;
+      --bg-panel: #1e2231;
+      --bg-header: #24293a;
+      --border: #2d3448;
+      --text-main: #bac4d9;
+      --text-muted: #7985a3;
+      
+      --color-green: #2ecc71;
+      --color-yellow: #f1c40f;
+      --color-red: #e74c3c;
+      --color-blue: #3498db;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body { 
+      background-color: var(--bg-main); 
+      color: var(--text-main); 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+      font-size: 13px; 
+      padding: 20px;
+    }
+
+    /* --- Système de Grille --- */
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .grid-bottom { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+    /* --- Panneaux (Cards) --- */
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .panel-header {
+      background: var(--bg-header);
+      padding: 10px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-main);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-body { padding: 16px; flex-grow: 1; }
+    
+    .panel-body.no-padding { padding: 0; }
+
+    /* --- Indicateurs du haut (Top Row) --- */
+    .kpi-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+    .kpi-label { font-size: 10px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; letter-spacing: 1px;}
+    .kpi-value { font-size: 24px; font-weight: bold; }
+    
+    .text-green { color: var(--color-green); }
+    .text-yellow { color: var(--color-yellow); }
+    .text-blue { color: var(--color-blue); }
+    .text-red { color: var(--color-red); }
+
+    /* --- Tableaux --- */
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { 
+      padding: 10px 16px; 
+      font-size: 10px; 
+      text-transform: uppercase; 
+      color: var(--text-muted); 
+      border-bottom: 1px solid var(--border); 
+      background: rgba(0,0,0,0.1);
+    }
+    td { 
+      padding: 12px 16px; 
+      font-size: 12px; 
+      border-bottom: 1px solid rgba(45, 52, 72, 0.5); 
+      font-family: 'Consolas', 'Monaco', monospace; /* Police monospace pour les données */
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background-color: rgba(255,255,255,0.02); }
+
+    /* --- Badges --- */
+    .badge {
+      padding: 3px 8px;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .badge-blue { background: rgba(52, 152, 219, 0.15); color: #6db1ff; border: 1px solid rgba(52, 152, 219, 0.3); }
+    .badge-yellow-outline { color: var(--color-yellow); border: 1px solid rgba(241, 196, 15, 0.4); }
+
+    .empty-row { text-align: center; color: var(--color-red); padding: 16px; font-size: 11px; }
+
+    /* --- Barres de progression (Logs & Retention) --- */
+    .progress-wrapper { margin-bottom: 10px; }
+    .progress-info { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; text-transform: uppercase; margin-bottom: 6px; }
+    .progress-bar-bg { width: 100%; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .progress-fill-green { height: 100%; background: var(--color-green); width: 100%; }
+    .progress-fill-blue { height: 100%; background: var(--color-blue); width: 24%; /* 1.2GB / 5GB ratio */ }
+
+    /* --- Boutons d'action --- */
+    .action-btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      padding: 12px;
+      background: var(--bg-header);
+      color: var(--text-main);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      margin-bottom: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .action-btn:hover { background: #2a3045; border-color: #3b4460; cursor: pointer; }
+    .action-btn:last-child { margin-bottom: 0; }
+
+  </style>
+</head>
+<body>
+
+  <div class="grid-4">
+    <div class="panel kpi-box">
+      <span class="kpi-label">System Status</span>
+      <span class="kpi-value text-green">OK</span>
+    </div>
+    <div class="panel kpi-box">
+      <span class="kpi-label">Active Triggers</span>
+      <span class="kpi-value text-yellow">{{ active_triggers | default('0') }}</span>
+    </div>
+    <div class="panel kpi-box">
+      <span class="kpi-label">Current Pod</span>
+      <span class="kpi-value" style="font-size: 16px; font-family: monospace; color: var(--text-main);">{{ pod_name | default('senti-soc-master-1') }}</span>
+    </div>
+    <div class="panel kpi-box">
+      <span class="kpi-label">Local Time</span>
+      <span class="kpi-value" style="font-size: 16px; color: var(--text-main);" id="clock">--:--:--</span>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom: 16px;">
+    <div class="panel-header">
+      <span>Infrastructure Services</span>
+      <span class="badge badge-blue">Live Probes</span>
+    </div>
+    <div class="panel-body no-padding">
+      <table>
+        <thead>
+          <tr>
+            <th>Microservice</th>
+            <th>Health Status</th>
+            <th>Active Pod Node</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for svc in service_health %}
+          <tr>
+            <td>{{ svc.name }}</td>
+            <td><span class="badge badge-yellow-outline">{{ svc.status }}</span></td>
+            <td style="color: var(--text-muted);">{{ svc.pod }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="3" class="empty-row">No services available or cluster offline.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel">
+      <div class="panel-header">
+        <span>Active Reservations</span>
+        <span style="color: var(--text-muted); font-size: 10px;">API: {{ RES_STATUS | default('OK') }}</span>
+      </div>
+      <div class="panel-body no-padding">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Target Resource</th>
+              <th>Status</th>
+              <th>Expires</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for res in reservations %}
+            <tr>
+              <td style="color: var(--color-blue);">{{ res.id }}</td>
+              <td>{{ res.target }}</td>
+              <td><span class="badge badge-yellow-outline">{{ res.status }}</span></td>
+              <td style="color: var(--text-muted);">{{ res.expires }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="4" class="empty-row">No reservations available or service offline.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span>Live Resources</span>
+        <span style="color: var(--text-muted); font-size: 10px;">API: {{ RESOURCE_STATUS | default('OK') }}</span>
+      </div>
+      <div class="panel-body no-padding">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Health</th>
+              <th>Load (CPU/Mem)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for resource in resources %}
+            <tr>
+              <td>{{ resource.name }}</td>
+              <td style="color: var(--text-muted);">{{ resource.type }}</td>
+              <td><span class="badge badge-yellow-outline">{{ resource.health }}</span></td>
+              <td>{{ resource.cpu_load }} / {{ resource.memory_load }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="4" class="empty-row">No resources available or service offline.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-bottom">
+    
+    <div class="panel">
+      <div class="panel-header">CPU Load / Network Traffic</div>
+      <div class="panel-body">
+        </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">Log Pipeline & Storage</div>
+      <div class="panel-body">
+        
+        <div class="progress-wrapper">
+          <div class="progress-info">
+            <span style="color: var(--text-muted);">Promtail Pipeline</span>
+            <span class="text-green">ACTIVE</span>
+          </div>
+          <div style="font-size: 12px; margin-bottom: 8px;">Scraping Logs</div>
+          <div class="progress-bar-bg">
+            <div class="progress-fill-green"></div>
+          </div>
+        </div>
+
+        <div class="progress-wrapper" style="margin-top: 24px;">
+          <div class="progress-info">
+            <span style="color: var(--text-muted);">Loki Retention</span>
+            <span class="text-blue">1.2GB / 5GB</span>
+          </div>
+          <div style="font-size: 12px; margin-bottom: 8px;">Data Stored</div>
+          <div class="progress-bar-bg">
+            <div class="progress-fill-blue"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">Cluster Actions</div>
+      <div class="panel-body" style="display: flex; flex-direction: column; justify-content: center;">
+        <a href="http://localhost:3000" target="_blank" class="action-btn">Open Grafana Console</a>
+        <a href="http://localhost:9090/targets" target="_blank" class="action-btn">Open Prometheus Targets</a>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Petit script pour faire fonctionner l'horloge locale en haut à droite
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').innerText = now.toLocaleTimeString('en-US', { hour12: false });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+  </script>
+</body>
+</html>
